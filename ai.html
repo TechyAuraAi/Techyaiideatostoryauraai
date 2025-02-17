@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Chatbot</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f4f4f9;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+    }
+
+    .chat-container {
+      width: 400px;
+      background: #fff;
+      border-radius: 10px;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .chat-header {
+      background: #6200ea;
+      color: white;
+      padding: 15px;
+      text-align: center;
+      font-size: 18px;
+      font-weight: bold;
+    }
+
+    .chat-history {
+      flex: 1;
+      padding: 15px;
+      overflow-y: auto;
+      border-bottom: 1px solid #ddd;
+    }
+
+    .message {
+      margin-bottom: 10px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .user-message {
+      align-self: flex-end;
+      background: #6200ea;
+      color: white;
+      padding: 10px;
+      border-radius: 10px 10px 0 10px;
+      max-width: 70%;
+    }
+
+    .bot-message {
+      align-self: flex-start;
+      background: #f1f1f1;
+      color: #333;
+      padding: 10px;
+      border-radius: 10px 10px 10px 0;
+      max-width: 70%;
+    }
+
+    .chat-input {
+      display: flex;
+      padding: 10px;
+      background: #f9f9f9;
+    }
+
+    .chat-input input {
+      flex: 1;
+      padding: 10px;
+      border: 1px solid #ddd;
+      border-radius: 5px;
+      margin-right: 10px;
+    }
+
+    .chat-input select {
+      padding: 10px;
+      border: 1px solid #ddd;
+      border-radius: 5px;
+      margin-right: 10px;
+    }
+
+    .chat-input button {
+      padding: 10px 15px;
+      background: #6200ea;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+
+    .chat-input button:hover {
+      background: #3700b3;
+    }
+
+    .login-container {
+      text-align: center;
+    }
+
+    .login-container button {
+      padding: 10px 20px;
+      background: #6200ea;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+
+    .login-container button:hover {
+      background: #3700b3;
+    }
+  </style>
+</head>
+<body>
+  <div class="chat-container" id="chat-container" style="display: none;">
+    <div class="chat-header">AI Chatbot</div>
+    <div class="chat-history" id="chat-history"></div>
+    <div class="chat-input">
+      <input type="text" id="user-input" placeholder="Type your message..." />
+      <select id="mode-select">
+        <option value="coding">Coding Assistant</option>
+        <option value="chef">Chef</option>
+        <option value="script">Script Writer</option>
+        <option value="story">Story Writer</option>
+        <option value="music">Music Writer</option>
+      </select>
+      <button id="send-btn">Send</button>
+    </div>
+  </div>
+
+  <div class="login-container" id="login-container">
+    <button id="google-login">Login with Google</button>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.3.1/firebase-app.js";
+    import { getAuth, signInWithPopup, GoogleAuthProvider } from "https://www.gstatic.com/firebasejs/11.3.1/firebase-auth.js";
+    import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/11.3.1/firebase-firestore.js";
+
+    // Firebase configuration
+    const firebaseConfig = {
+      apiKey: "AIzaSyA6ejmjeM95vLusgElaWiaYhz9LsDzb570",
+      authDomain: "the-ai-writter.firebaseapp.com",
+      projectId: "the-ai-writter",
+      storageBucket: "the-ai-writter.appspot.com",
+      messagingSenderId: "534510524025",
+      appId: "1:534510524025:web:964cd9bbb03abf05e666a8",
+      measurementId: "G-17WMXLN99J"
+    };
+
+    // Initialize Firebase
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+    // Google login
+    const googleLoginBtn = document.getElementById("google-login");
+    googleLoginBtn.addEventListener("click", async () => {
+      const provider = new GoogleAuthProvider();
+      try {
+        const result = await signInWithPopup(auth, provider);
+        const user = result.user;
+        console.log("Logged in user:", user);
+        document.getElementById("login-container").style.display = "none";
+        document.getElementById("chat-container").style.display = "flex";
+        loadChatHistory(user.uid);
+      } catch (error) {
+        console.error("Error during login:", error);
+      }
+    });
+
+    // Save chat history
+    async function saveChatHistory(userId, chat) {
+      const userDoc = doc(db, "chats", userId);
+      await setDoc(userDoc, { chat }, { merge: true });
+    }
+
+    // Load chat history
+    async function loadChatHistory(userId) {
+      const userDoc = doc(db, "chats", userId);
+      const docSnap = await getDoc(userDoc);
+      if (docSnap.exists()) {
+        const chatHistory = docSnap.data().chat;
+        const chatHistoryDiv = document.getElementById("chat-history");
+        chatHistoryDiv.innerHTML = chatHistory;
+      }
+    }
+
+    // Call Gemini API
+    async function callGeminiAPI(prompt, mode) {
+      const apiKey = "AIzaSyBXkAMgCZ28z1Bu2vfvYJza6fnAoRPJYq8";
+      const endpoint = "https://api.gemini.com/v1/chat"; // Replace with actual endpoint
+
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${apiKey}`
+        },
+        body: JSON.stringify({
+          prompt: prompt,
+          mode: mode
+        })
+      });
+
+      const data = await response.json();
+      return data.response;
+    }
+
+    // Send message
+    const sendBtn = document.getElementById("send-btn");
+    sendBtn.addEventListener("click", async () => {
+      const userInput = document.getElementById("user-input").value;
+      const selectedMode = document.getElementById("mode-select").value;
+      const chatHistoryDiv = document.getElementById("chat-history");
+
+      // Add user message to chat history
+      chatHistoryDiv.innerHTML += `<div class="message"><div class="user-message">You: ${userInput}</div></div>`;
+
+      // Call Gemini API
+      const botResponse = await callGeminiAPI(userInput, selectedMode);
+
+      // Add bot response to chat history
+      chatHistoryDiv.innerHTML += `<div class="message"><div class="bot-message">Bot: ${botResponse}</div></div>`;
+
+      // Save chat history
+      const user = auth.currentUser;
+      if (user) {
+        await saveChatHistory(user.uid, chatHistoryDiv.innerHTML);
+      }
+
+      // Clear input
+      document.getElementById("user-input").value = "";
+    });
+  </script>
+</body>
+</html>
